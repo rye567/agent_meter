@@ -28,11 +28,13 @@ macOS 菜单栏 Code Agent 用量监控。轻量原生 Swift 实现，零第三�
 依赖：Xcode Command Line Tools（无需完整 Xcode）。
 
 ```bash
-./build.sh          # 产物：AgentMeter.app（ad-hoc 签名）
+./build.sh          # 产物：AgentMeter.app
 open AgentMeter.app
 
 ./dist.sh           # 进一步产出 universal DMG（tools/sign.sh、tools/check_no_secrets.py 门禁）
 ```
+
+签名：构建时自动选用钥匙串中的 **AgentMeter Dev** 自签名身份（每台开发机只需执行一次 `./tools/make_cert.sh` 创建，幂等，之后构建自动复用，应用更新不再弹钥匙串授权）；未创建该身份时回退 ad-hoc 签名，不影响功能。直接下载 Release DMG 的用户无需任何签名步骤。
 
 首次运行如被 Gatekeeper 拦截：右键 App → 打开。
 
