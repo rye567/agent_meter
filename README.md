@@ -2,8 +2,6 @@
 
 macOS 菜单栏 Code Agent 用量监控。轻量原生 Swift 实现，零第三方依赖。
 
-> 项目包名 `agent_meter`（小写下划线），应用显示名 **AgentMeter**。
-
 ![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue) ![Swift](https://img.shields.io/badge/Swift-5-orange) ![License](https://img.shields.io/badge/License-MIT-green)
 
 | 浅色模式 | 深色模式 |
