@@ -70,6 +70,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let button = statusItem?.button else { return }
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        // 每次点开面板都触发刷新（去抖合并）。
+        // 不能依赖 PanelView.onAppear：NSPopover 复用 contentViewController，
+        // SwiftUI 的 onAppear 只在首次显示时触发，之后点击状态栏不会再回调。
+        appModel.refreshOnPanelOpen()
     }
 
     // MARK: 设置窗口（独立 NSWindow，避免依赖 SwiftUI 场景选择器）
