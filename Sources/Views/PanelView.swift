@@ -85,7 +85,7 @@ struct PanelView: View {
             .padding(.vertical, 8)
         }
         .frame(width: 360)
-        .onAppear { appModel.refreshIfNeeded() }
+        .onAppear { appModel.refreshOnPanelOpen() }
     }
 
     private var visibleCount: Int {

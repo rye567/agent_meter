@@ -18,6 +18,8 @@ final class AppModel: ObservableObject {
     @Published var isRefreshing = false
 
     private var autoTask: Task<Void, Never>?
+    /// 面板打开触发的去抖刷新任务
+    private var panelRefreshTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
     /// 各窗口已提醒的最高阈值（key = slot|窗口名），回落到最低阈值以下时重置
     private var alertedLevels: [String: Int] = [:]
@@ -50,14 +52,14 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// 面板打开时调用：数据过期（>1 分钟）才刷新
-    func refreshIfNeeded() {
-        guard let last = lastUpdated else {
-            Task { await refreshAll() }
-            return
-        }
-        if Date().timeIntervalSince(last) > 60 {
-            Task { await refreshAll() }
+    /// 面板打开时调用：每次点开状态栏立即刷新；短时间内重复触发
+    /// （快速连点状态栏）合并为一次请求，防止刷爆接口
+    func refreshOnPanelOpen() {
+        panelRefreshTask?.cancel()
+        panelRefreshTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.refreshAll()
         }
     }
 
