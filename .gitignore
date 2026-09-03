@@ -1,0 +1,7 @@
+.build/
+.build_dist/
+*.app
+*.dmg
+.DS_Store
+.cert/
+*.pem
