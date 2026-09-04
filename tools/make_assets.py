@@ -1,41 +1,58 @@
 #!/usr/bin/env python3
 """生成 agent_meter 图标资源：
-1. 从图集裁出 App 图标（1024）→ iconset → AppIcon.icns
-2. 从黑底图裁 logo、黑转透明 → 菜单栏图标 menubar.png (36x36)
+1. 从图集左侧裁出 App 图标（1024）→ 白角转透明 → iconset → AppIcon.icns
+2. 从图集底部裁出黑色鲸鱼剪影 → 黑转透明 → 菜单栏图标 menubar.png（template 用）
 """
-from PIL import Image, ImageChops
+from PIL import Image, ImageDraw
 import os, subprocess, sys
 
-DOWNLOADS = os.path.expanduser("~/Downloads")
-SHEET = os.path.join(DOWNLOADS, "ChatGPT Image 2026年9月3日 11_15_10.png")
-DARK = os.path.join(DOWNLOADS, "ChatGPT Image 2026年9月3日 11_17_43.png")
+SHEET = os.path.expanduser(
+    "~/Downloads/ChatGPT Image 2026年9月4日 15_41_49.png")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RES = os.path.join(ROOT, "Resources")
 os.makedirs(RES, exist_ok=True)
 
-# ── 1. App 图标：定位图集顶部大图标（0.63H 以内，避开底部标注文字）──
 sheet = Image.open(SHEET).convert("RGB")
 W, H = sheet.size
-top = sheet.crop((0, 0, W, int(H * 0.63)))
-bg = Image.new("RGB", top.size, top.getpixel((5, 5)))
-diff = ImageChops.difference(top, bg).convert("L")
-mask = diff.point(lambda p: 255 if p > 12 else 0)
-bbox = mask.getbbox()
-if not bbox:
+
+# ── 1. App 图标：左半区内按「蓝色像素」定位（避开右侧尺寸变体与灰色标注文字）──
+left = sheet.crop((0, 0, W // 2, int(H * 0.85)))
+px = left.load()
+w, h = left.size
+bbox = None
+l, t, r, b = w, h, 0, 0
+for y in range(0, h, 2):
+    for x in range(0, w, 2):
+        r_, g_, b_ = px[x, y]
+        if b_ > 150 and b_ - r_ > 60 and b_ - g_ > 60:
+            l, t = min(l, x), min(t, y)
+            r, b = max(r, x), max(b, y)
+if r <= l or b <= t:
     sys.exit("未能定位 App 图标区域")
-l, t, r, b = bbox
-# 外扩 1.5% 容纳软阴影，取正方形
+bbox = (l, t, r, b)
 cx, cy = (l + r) / 2, (t + b) / 2
-side = max(r - l, b - t) * 1.03
+side = max(r - l, b - t) * 1.01          # 微外扩容纳软阴影
 half = side / 2
 l, t, r, b = int(cx - half), int(cy - half), int(cx + half), int(cy + half)
 l, t = max(l, 0), max(t, 0)
-r, b = min(r, W), min(b, int(H * 0.70))
-side = min(r - l, b - t)
-icon = sheet.crop((l, t, l + side, t + side)).resize((1024, 1024), Image.LANCZOS)
+r, b = min(r, w), min(b, h)
+icon = left.crop((l, t, r, b)).resize((1024, 1024), Image.LANCZOS).convert("RGBA")
+
+# 白角转透明：从四角 floodfill 相近白色区域，再映射为 alpha=0
+icon_rgb = icon.convert("RGB")
+MAGIC = (255, 0, 255)
+for seed in [(0, 0), (1023, 0), (0, 1023), (1023, 1023)]:
+    ImageDraw.floodfill(icon_rgb, seed, MAGIC, thresh=70)
+px = icon_rgb.load()
+pxa = icon.load()
+for y in range(1024):
+    for x in range(1024):
+        if px[x, y] == MAGIC:
+            pxa[x, y] = (0, 0, 0, 0)
+
 icon_path = os.path.join(RES, "app_icon_1024.png")
 icon.save(icon_path)
-print(f"✓ App 图标裁剪 bbox=({l},{t},{r},{b}) → {icon_path}")
+print(f"✓ App 图标裁剪 bbox={bbox} → {icon_path}")
 
 # ── 2. iconset → icns ──────────────────────────────────────
 iconset = os.path.join(RES, "AppIcon.iconset")
@@ -47,32 +64,33 @@ for size in (16, 32, 128, 256, 512):
 subprocess.run(["iconutil", "-c", "icns", iconset, "-o", os.path.join(RES, "AppIcon.icns")], check=True)
 print("✓ AppIcon.icns 生成")
 
-# ── 3. 菜单栏图标：裁圆环 logo + 黑转透明 ────────────────────
-dark = Image.open(DARK).convert("RGB")
-W2, H2 = dark.size
-bg2 = dark.getpixel((5, 5))
-top2 = dark  # 整图找亮区
-diff2 = ImageChops.difference(top2, Image.new("RGB", top2.size, bg2)).convert("L")
-mask2 = diff2.point(lambda p: 255 if p > 18 else 0)
-bbox2 = mask2.getbbox()
-l2, t2, r2, b2 = bbox2
-cx2, cy2 = (l2 + r2) / 2, (t2 + b2) / 2
-side2 = max(r2 - l2, b2 - t2) * 1.02
-half2 = side2 / 2
-crop = dark.crop((int(cx2 - half2), int(cy2 - half2), int(cx2 + half2), int(cy2 + half2))).convert("RGBA")
+# ── 3. 菜单栏图标：图集底部黑鲸鱼剪影 → 黑转透明（template 用）──
+# 限定区域避开下方「18 × 18」标注与右侧菜单栏示意
+GLYPH_BOX = (int(W * 0.50), int(H * 0.76), int(W * 0.60), int(H * 0.885))
+glyph_src = sheet.crop(GLYPH_BOX)
+gpx = glyph_src.load()
+gw, gh = glyph_src.size
+gl, gt, gr, gb = gw, gh, 0, 0
+for y in range(gh):
+    for x in range(gw):
+        r_, g_, b_ = gpx[x, y]
+        if max(r_, g_, b_) < 110:
+            gl, gt = min(gl, x), min(gt, y)
+            gr, gb = max(gr, x), max(gb, y)
+if gr <= gl or gb <= gt:
+    sys.exit("未能定位菜单栏图标剪影")
+glyph_src = glyph_src.crop((gl, gt, gr + 1, gb + 1)).convert("RGBA")
 
-# 逐像素：max(r,g,b) <12 → 全透明；12~50 渐变；>50 不透明
-px = crop.load()
-w2, h2 = crop.size
-for y in range(h2):
-    for x in range(w2):
-        r, g, b, a = px[x, y]
-        m = max(r, g, b)
-        if m < 12:
-            px[x, y] = (r, g, b, 0)
-        elif m < 50:
-            px[x, y] = (r, g, b, int((m - 12) * 255 / 38))
+# alpha = 255 - 亮度（黑=不透明），RGB 统一纯黑，交由 macOS template 渲染
+gpx = glyph_src.load()
+gw, gh = glyph_src.size
+for y in range(gh):
+    for x in range(gw):
+        r_, g_, b_, _ = gpx[x, y]
+        lum = max(r_, g_, b_)
+        gpx[x, y] = (0, 0, 0, 255 - lum)
+
 menubar_path = os.path.join(RES, "menubar.png")
-crop.resize((36, 36), Image.LANCZOS).save(menubar_path)
-crop.resize((64, 64), Image.LANCZOS).save(os.path.join(RES, "menubar@2x.png"))
-print(f"✓ 菜单栏图标 bbox={bbox2} → {menubar_path}")
+glyph_src.resize((36, 36), Image.LANCZOS).save(menubar_path)
+glyph_src.resize((64, 64), Image.LANCZOS).save(os.path.join(RES, "menubar@2x.png"))
+print(f"✓ 菜单栏图标 bbox=({gl},{gt},{gr},{gb}) @图集内区域{GLYPH_BOX} → {menubar_path}")

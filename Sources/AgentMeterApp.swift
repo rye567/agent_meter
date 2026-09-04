@@ -34,11 +34,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         guard let button = item.button else { return }
-        // 自定义菜单栏图标（36px 绘制为 18pt，Retina 下清晰）
+        // 自定义菜单栏图标（template：单色剪影自动适配菜单栏深浅色）
         if let url = Bundle.main.url(forResource: "menubar", withExtension: "png"),
            let image = NSImage(contentsOf: url) {
             image.size = NSSize(width: 18, height: 18)
-            image.isTemplate = false
+            image.isTemplate = true
             button.image = image
         } else {
             let symbol = NSImage(systemSymbolName: "speedometer", accessibilityDescription: "AgentMeter")
