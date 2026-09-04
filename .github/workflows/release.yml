@@ -1,0 +1,109 @@
+name: Build & Release
+
+# 推送 main → 自动构建并更新滚动预发布 latest
+# 推送 v* 标签 → 创建正式版本 Release
+# 支持在 Actions 页面手动触发（workflow_dispatch）
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 同一分支/标签的连续推送只保留最新一次构建，避免并发抢写 Release
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build DMG (universal + secret gate)
+        run: ./dist.sh
+
+      - name: Collect DMG info
+        id: dmg
+        run: |
+          DMG_PATH=$(ls AgentMeter-*.dmg | head -1)
+          echo "path=${DMG_PATH}" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "${DMG_PATH}")" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(shasum -a 256 "${DMG_PATH}" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AgentMeter-DMG
+          path: AgentMeter-*.dmg
+          if-no-files-found: error
+
+      # ---- main 推送：滚动更新 latest 预发布 ----
+      - name: Update rolling latest prerelease
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DMG_PATH: ${{ steps.dmg.outputs.path }}
+          DMG_NAME: ${{ steps.dmg.outputs.name }}
+          DMG_SHA256: ${{ steps.dmg.outputs.sha256 }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          gh release delete latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes 2>/dev/null || true
+
+          cat > release-notes.md <<EOF
+          # AgentMeter 最新构建（自动发布）
+
+          > 滚动预发布：每次推送到 main 自动构建，始终对应最新代码。
+
+          - 附件：\`${DMG_NAME}\`（universal：Apple Silicon + Intel）
+          - SHA256: \`${DMG_SHA256}\`
+          - 构建来源：commit \`${COMMIT_SHA:0:8}\`
+
+          ## 安装
+          1. 打开 DMG，将 **AgentMeter.app** 拖入「应用程序」
+          2. 首次运行若被 Gatekeeper 拦截：**右键 App → 打开**
+          EOF
+
+          gh release create latest "$DMG_PATH" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$COMMIT_SHA" \
+            --prerelease \
+            --title "AgentMeter 最新构建" \
+            --notes-file release-notes.md
+
+      # ---- v* 标签推送：正式版本 Release ----
+      - name: Create versioned release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DMG_PATH: ${{ steps.dmg.outputs.path }}
+          DMG_NAME: ${{ steps.dmg.outputs.name }}
+          DMG_SHA256: ${{ steps.dmg.outputs.sha256 }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+
+          cat > release-notes.md <<EOF
+          # AgentMeter $TAG
+
+          - 附件：\`${DMG_NAME}\`（universal：Apple Silicon + Intel）
+          - SHA256: \`${DMG_SHA256}\`
+
+          ## 安装
+          1. 打开 DMG，将 **AgentMeter.app** 拖入「应用程序」
+          2. 首次运行若被 Gatekeeper 拦截：**右键 App → 打开**（自签名分发，需确认一次）
+          3. 菜单栏点击仪表盘图标展开面板，齿轮进入设置填入 API Key
+          EOF
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$DMG_PATH" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "$DMG_PATH" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "AgentMeter $TAG" \
+              --notes-file release-notes.md
+          fi

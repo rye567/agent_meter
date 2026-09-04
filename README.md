@@ -38,6 +38,10 @@ open AgentMeter.app
 
 首次运行如被 Gatekeeper 拦截：右键 App → 打开。
 
+## 自动打包
+
+推送代码到 `main` 后，GitHub Actions 自动构建 universal DMG 并更新 [latest 预发布](https://github.com/rye567/agent_meter/releases/tag/latest)；发布正式版本时：修改 `Info.plist` 版本号 → 推送 `v*` 标签（如 `v0.1.1`）→ 自动创建对应 Release。
+
 ## 使用
 
 1. 菜单栏点击仪表盘图标展开面板
