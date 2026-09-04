@@ -81,14 +81,22 @@ if gr <= gl or gb <= gt:
     sys.exit("未能定位菜单栏图标剪影")
 glyph_src = glyph_src.crop((gl, gt, gr + 1, gb + 1)).convert("RGBA")
 
-# alpha = 255 - 亮度（黑=不透明），RGB 统一纯黑，交由 macOS template 渲染
+# alpha 二值化：暗剪影全不透明（与其他菜单栏图标同密度），亮背景全透明，
+# 中间窄带线性过渡保边缘平滑。若用 255-亮度，灰阶噪点会让图标整体发灰
+THRESH_LO, THRESH_HI = 100, 200
 gpx = glyph_src.load()
 gw, gh = glyph_src.size
 for y in range(gh):
     for x in range(gw):
         r_, g_, b_, _ = gpx[x, y]
         lum = max(r_, g_, b_)
-        gpx[x, y] = (0, 0, 0, 255 - lum)
+        if lum >= THRESH_HI:
+            alpha = 0
+        elif lum <= THRESH_LO:
+            alpha = 255
+        else:
+            alpha = int((THRESH_HI - lum) * 255 / (THRESH_HI - THRESH_LO))
+        gpx[x, y] = (0, 0, 0, alpha)
 
 menubar_path = os.path.join(RES, "menubar.png")
 # 保持剪影原始宽高比（以 18pt 高为基准出 2x/4x 图），禁止强行压进正方形

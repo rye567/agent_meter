@@ -38,8 +38,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 等比缩放到 18pt 高，宽度随原始比例自适应，避免拉伸变形
         if let url = Bundle.main.url(forResource: "menubar", withExtension: "png"),
            let image = NSImage(contentsOf: url) {
+            // 等比缩放，视觉尺寸对齐微信菜单栏图标（16pt 高），宽度按原始比例自适应
+            let targetHeight: CGFloat = 16
             let ratio = image.size.width / image.size.height
-            image.size = NSSize(width: (18 * ratio).rounded(), height: 18)
+            image.size = NSSize(width: (targetHeight * ratio).rounded(), height: targetHeight)
             image.isTemplate = true
             button.image = image
             item.length = NSStatusItem.variableLength
