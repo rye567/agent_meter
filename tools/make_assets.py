@@ -91,6 +91,8 @@ for y in range(gh):
         gpx[x, y] = (0, 0, 0, 255 - lum)
 
 menubar_path = os.path.join(RES, "menubar.png")
-glyph_src.resize((36, 36), Image.LANCZOS).save(menubar_path)
-glyph_src.resize((64, 64), Image.LANCZOS).save(os.path.join(RES, "menubar@2x.png"))
-print(f"✓ 菜单栏图标 bbox=({gl},{gt},{gr},{gb}) @图集内区域{GLYPH_BOX} → {menubar_path}")
+# 保持剪影原始宽高比（以 18pt 高为基准出 2x/4x 图），禁止强行压进正方形
+ratio = gw / gh
+glyph_src.resize((round(36 * ratio), 36), Image.LANCZOS).save(menubar_path)
+glyph_src.resize((round(72 * ratio), 72), Image.LANCZOS).save(os.path.join(RES, "menubar@2x.png"))
+print(f"✓ 菜单栏图标 bbox=({gl},{gt},{gr},{gb}) 比例={ratio:.2f} → {menubar_path}")
