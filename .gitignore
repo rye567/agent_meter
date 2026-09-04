@@ -5,3 +5,4 @@
 .DS_Store
 .cert/
 *.pem
+*.p12
