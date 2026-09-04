@@ -30,13 +30,16 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
     -out "$WORKDIR/cert.pem" 2>/dev/null
 
 echo "▸ 导入 p12（证书+私钥）…"
+# 临时打包密码：随机生成、用后即弃（p12 导入钥匙串后立即删除，不留任何固定口令）
+P12_PASS="$(openssl rand -hex 16)"
 openssl pkcs12 -export \
     -inkey "$WORKDIR/key.pem" -in "$WORKDIR/cert.pem" \
-    -out "$WORKDIR/cert.p12" -passout pass:agentmeter 2>/dev/null
+    -out "$WORKDIR/cert.p12" -passout "pass:$P12_PASS" 2>/dev/null
 security import "$WORKDIR/cert.p12" \
     -k "$HOME/Library/Keychains/login.keychain-db" \
-    -P agentmeter \
+    -P "$P12_PASS" \
     -T /usr/bin/codesign
+unset P12_PASS
 
 echo "▸ 标记证书为「代码签名受信任」…"
 security add-trusted-cert -r trustRoot -p codeSign \
