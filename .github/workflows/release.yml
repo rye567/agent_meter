@@ -26,6 +26,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Import signing identity
+        timeout-minutes: 3
         env:
           MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
           MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
@@ -39,9 +40,10 @@ jobs:
           echo "$MAC_CERT_P12" | base64 --decode > /tmp/cert.p12
           security create-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
           security import /tmp/cert.p12 -k "$KEYCHAIN_PATH" -P "$MAC_CERT_PASSWORD" -T /usr/bin/codesign
-          # 证书必须标记「代码签名受信任」，否则 find-identity -p codesigning 不显示（同 tools/make_cert.sh）
+          # 证书必须标记「代码签名受信任」，否则 find-identity -p codesigning 不显示（同 tools/make_cert.sh）。
+          # runner 无 GUI，信任必须写入 admin 域（runner 免密 sudo）；写 user 域会挂起等授权
           security find-certificate -c "AgentMeter Dev" -p "$KEYCHAIN_PATH" > /tmp/cert.pem
-          security add-trusted-cert -r trustRoot -p codeSign -k "$KEYCHAIN_PATH" /tmp/cert.pem
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign /tmp/cert.pem
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
           security default-keychain -d user -s "$KEYCHAIN_PATH"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASS" "$KEYCHAIN_PATH" >/dev/null
