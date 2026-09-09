@@ -8,6 +8,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let popover = NSPopover()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 单实例保护：同 Bundle ID 已有运行实例（如 DMG 直接运行 + /Applications 双副本）
+        // 时，激活已有实例并退出当前进程，避免出现第二个菜单栏图标
+        let others = NSRunningApplication.runningApplications(
+            withBundleIdentifier: Bundle.main.bundleIdentifier ?? ""
+        ).filter { $0 != NSRunningApplication.current }
+        if let other = others.first {
+            other.activate()
+            NSApp.terminate(nil)
+            return
+        }
+
         NotificationService.configure()
         #if DEBUG_ICON
         for asset in ["provider_deepseek", "provider_kimi"] {
