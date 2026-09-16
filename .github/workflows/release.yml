@@ -52,7 +52,10 @@ jobs:
           rm -f /tmp/cert.p12 /tmp/cert.pem
 
       - name: Build DMG (universal + secret gate)
-        run: ./dist.sh
+        run: |
+          # 防御：清理检出后可能存在的旧 DMG，避免 ls 选中陈旧产物
+          rm -f AgentMeter-*.dmg
+          ./dist.sh
 
       - name: Collect DMG info
         id: dmg
