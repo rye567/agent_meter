@@ -13,6 +13,7 @@ final class SettingsStore: ObservableObject {
         static let alertThresholds = "alertThresholds"
         static let showBalance = "showBalance"
         static let refreshIntervalMinutes = "refreshIntervalMinutes"
+        static let showSystemMonitor = "showSystemMonitor"
         // 旧版键（仅迁移读取）
         static let legacyGlmEnabled = "glmEnabled"
         static let legacyCodexEnabled = "codexEnabled"
@@ -30,6 +31,10 @@ final class SettingsStore: ObservableObject {
     @Published var refreshIntervalMinutes: Int {
         didSet { defaults.set(refreshIntervalMinutes, forKey: Key.refreshIntervalMinutes) }
     }
+    /// 面板系统监控（四宫格）显示开关；关闭时不创建采集器、不做后台采样
+    @Published var showSystemMonitor: Bool {
+        didSet { defaults.set(showSystemMonitor, forKey: Key.showSystemMonitor) }
+    }
     @Published var alertsEnabled: Bool {
         didSet { defaults.set(alertsEnabled, forKey: Key.alertsEnabled) }
     }
@@ -38,6 +43,7 @@ final class SettingsStore: ObservableObject {
     init() {
         showBalance = defaults.object(forKey: Key.showBalance) as? Bool ?? true
         refreshIntervalMinutes = defaults.object(forKey: Key.refreshIntervalMinutes) as? Int ?? 10
+        showSystemMonitor = defaults.object(forKey: Key.showSystemMonitor) as? Bool ?? false
         alertsEnabled = defaults.object(forKey: Key.alertsEnabled) as? Bool ?? false
 
         if let data = defaults.data(forKey: Key.agents),

@@ -37,6 +37,12 @@ final class SystemMonitor: ObservableObject {
         timer = nil
     }
 
+    deinit {
+        // 视图随开关移除时确保后台采样定时器真正停止
+        timer?.cancel()
+        timer = nil
+    }
+
     private func collect() -> SystemSnapshot {
         let processes = processSampler.collect(interval: interval)
         let cpu = cpuSampler.collect()

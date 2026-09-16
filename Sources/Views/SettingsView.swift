@@ -58,6 +58,7 @@ struct SettingsView: View {
                     Text("60 分钟").tag(60)
                 }
                 .pickerStyle(.radioGroup)
+                Toggle("面板显示系统监控", isOn: $settings.showSystemMonitor)
                 Toggle("登录时自动启动", isOn: $loginItemOn)
                     .onChange(of: loginItemOn) { _, newValue in
                         do {
@@ -84,7 +85,7 @@ struct SettingsView: View {
             }
 
             Section {
-                LabeledContent("版本") { Text("0.1.0") }
+                LabeledContent("版本") { Text("0.2.0") }
                 LabeledContent("应用") { Text("AgentMeter") }
             } header: {
                 Text("关于")

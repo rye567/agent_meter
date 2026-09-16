@@ -37,7 +37,10 @@ struct PanelView: View {
                 }
 
                 // 内部面板：系统监控四宫格（CPU/内存/磁盘/网络波浪图）
-                SystemMonitorSection()
+                // 开关关闭时不创建视图，SystemMonitor 随 @StateObject 释放、采样停止
+                if settings.showSystemMonitor {
+                    SystemMonitorSection()
+                }
             }
             .padding(12)
 
