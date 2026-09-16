@@ -35,6 +35,9 @@ struct PanelView: View {
                         .multilineTextAlignment(.center)
                         .padding(.vertical, 24)
                 }
+
+                // 内部面板：系统监控四宫格（CPU/内存/磁盘/网络波浪图）
+                SystemMonitorSection()
             }
             .padding(12)
 
