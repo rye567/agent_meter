@@ -25,6 +25,12 @@ final class AppModel: ObservableObject {
     private var alertedLevels: [String: Int] = [:]
 
     init() {
+        // 升级后一次性迁移旧钥匙串凭据（成败均写标记，此后永不读钥匙串）
+        let legacyAccounts = AgentType.allCases.map { SecretStore.agentAccount(for: $0) }
+            + [SecretStore.glmKeyAccount]
+            + settings.customProviders.map { SecretStore.customAccount(for: $0.id) }
+        SecretStore.migrateLegacyIfNeeded(accounts: legacyAccounts)
+
         settings.objectWillChange
             .debounce(for: .seconds(0.5), scheduler: RunLoop.main)
             .sink { [weak self] _ in self?.startAutoRefresh() }
@@ -74,7 +80,7 @@ final class AppModel: ObservableObject {
         let agentResults = await withTaskGroup(of: (AgentType, ProviderState).self) { group in
             for agent in s.agents {
                 let key = agent.type.needsKey
-                    ? KeychainService.load(account: KeychainService.agentAccount(for: agent.type))
+                    ? SecretStore.load(account: SecretStore.agentAccount(for: agent.type))
                     : nil
                 group.addTask {
                     (agent.type, await Self.fetchAgent(agent, key: key, showBalance: s.showBalance))
@@ -89,7 +95,7 @@ final class AppModel: ObservableObject {
         let enabledCustoms = s.customProviders.filter(\.enabled)
         let customResults = await withTaskGroup(of: (UUID, ProviderState).self) { group in
             for provider in enabledCustoms {
-                let key = KeychainService.load(account: KeychainService.customAccount(for: provider.id))
+                let key = SecretStore.load(account: SecretStore.customAccount(for: provider.id))
                 group.addTask {
                     (provider.id, await Self.fetchCustom(provider, key: key))
                 }

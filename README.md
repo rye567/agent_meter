@@ -19,7 +19,8 @@ macOS 菜单栏 Code Agent 用量监控。轻量原生 Swift 实现，零第三�
 - **DeepSeek / Kimi（Moonshot）**：API Key 直查账户余额
 - **自定义余额接口**：任意「GET + Bearer + JSON 余额字段」接口，endpoint + jsonPath 即可接入
 - **用量阈值提醒**：越过阈值发系统通知（默认 80%，可多档）
-- **安全**：API Key 仅存 macOS 钥匙串，不上传、不落明文；分发产物过密钥特征门禁扫描
+- **安全**：API Key 仅保存在本机用户目录（0600 权限文件，仅当前用户可读），不上传服务器；分发产物过密钥特征门禁扫描
+- **无感更新**：凭据存储与代码签名完全解耦，升级安装永不触发钥匙串授权弹窗（旧版钥匙串条目自动迁移）
 - 单源失败不影响其他源，卡片直接显示错误原因
 - 支持自动刷新间隔（5/10/30/60 分钟）、开机自启、深浅色自适应
 
@@ -36,7 +37,7 @@ open AgentMeter.app
 
 签名：构建时自动选用钥匙串中的 **AgentMeter Dev** 自签名身份（每台开发机只需执行一次 `./tools/make_cert.sh` 创建，幂等，之后构建自动复用，应用更新不再弹钥匙串授权）；未创建该身份时回退 ad-hoc 签名，不影响功能。直接下载 Release DMG 的用户无需任何签名步骤。
 
-> 排障：若更新构建后访问 API Key 仍连续弹出「输入密码」授权，说明对应钥匙串条目的访问控制（ACL）还钉在它创建时的旧签名上（通常是更早的 ad-hoc 构建）。**一次性处理**：弹出时点「始终允许」，或在设置中重新保存对应 Key——条目即改钉到 AgentMeter Dev 签名，之后同证书的构建不再弹窗。
+> 排障（仅 v0.2.0 及更早版本适用）：钥匙串授权弹窗源于钥匙串条目的 ACL 钉在创建时的旧签名上。**v0.2.1 起改用本机文件存储，不再使用钥匙串**，旧条目在首次读取时自动迁移（可能遇到最后一次系统提示），之后永不弹窗。
 
 首次运行如被 Gatekeeper 拦截：右键 App → 打开。
 
@@ -57,7 +58,7 @@ open AgentMeter.app
 | GLM 编码套餐 | HTTP | `open.bigmodel.cn/api/monitor/usage/quota/limit`（Authorization 头直传原始 Key，无 Bearer）+ 余额接口 |
 | Codex | 本地文件 | `~/.codex/sessions/**/*.jsonl` 中 `token_count` 事件的 `rate_limits` 快照 |
 | Claude Code | 本地文件 | `~/.claude/projects/**/*.jsonl` 中 `assistant` 消息的 `usage`，按 `message.id + requestId` 去重 |
-| DeepSeek / Kimi | HTTP | 各自开放平台余额接口，Key 存钥匙串 |
+| DeepSeek / Kimi | HTTP | 各自开放平台余额接口，Key 仅存本机 |
 | 自定义接口 | HTTP | `endpoint` + `jsonPath`（点路径）描述任意余额接口 |
 
 > 注：GLM 用量接口为官方插件所用非公开接口，字段可能随平台调整。
@@ -79,7 +80,8 @@ screenshots/                # README 截图（渲染自真实 UI + 演示数据�
 
 ## 安全设计
 
-- API Key 只写 macOS 钥匙串（`KeychainService`），UserDefaults 仅存非敏感配置
+- API Key 仅写本机 `~/Library/Application Support/AgentMeter/keys.json`（0600 权限，仅当前用户可读，`SecretStore`）；UserDefaults 仅存非敏感配置
+- 凭据存储与代码签名解耦：升级安装永不触发钥匙串授权弹窗（v0.2.0 及更早版本的钥匙串条目自动迁移）
 - 本地会话解析（Codex / Claude）零网络、零上传
 - `tools/check_no_secrets.py`：打包前扫描产物，比对本机已知密钥 + 通用密钥特征（`sk-`、`id.secret`），命中即中止分发
 

@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// 非敏感配置（UserDefaults 持久化）；API Key 一律存钥匙串（KeychainService）
+/// 非敏感配置（UserDefaults 持久化）；API Key 存本机文件（SecretStore，0600 权限）
 final class SettingsStore: ObservableObject {
     private let defaults = UserDefaults.standard
     private var cancellables = Set<AnyCancellable>()
@@ -112,18 +112,18 @@ final class SettingsStore: ObservableObject {
             for extra in list {
                 guard let presetID = extra.presetID, let type = AgentType(rawValue: presetID) else { continue }
                 if type == .deepseek { deepseekEnabled = extra.enabled }
-                let from = KeychainService.customAccount(for: extra.id)
-                let to = KeychainService.agentAccount(for: type)
-                if KeychainService.load(account: to) == nil,
-                   let key = KeychainService.load(account: from), !key.isEmpty {
-                    KeychainService.save(key, account: to)
+                let from = SecretStore.customAccount(for: extra.id)
+                let to = SecretStore.agentAccount(for: type)
+                if SecretStore.load(account: to) == nil,
+                   let key = SecretStore.load(account: from), !key.isEmpty {
+                    SecretStore.save(key, account: to)
                 }
             }
         }
         // GLM key 从旧账户迁移
-        if KeychainService.load(account: KeychainService.agentAccount(for: .glm)) == nil,
-           let glmKey = KeychainService.load(account: KeychainService.glmKeyAccount), !glmKey.isEmpty {
-            KeychainService.save(glmKey, account: KeychainService.agentAccount(for: .glm))
+        if SecretStore.load(account: SecretStore.agentAccount(for: .glm)) == nil,
+           let glmKey = SecretStore.load(account: SecretStore.glmKeyAccount), !glmKey.isEmpty {
+            SecretStore.save(glmKey, account: SecretStore.agentAccount(for: .glm))
         }
 
         let list = AgentType.allCases.map { type in

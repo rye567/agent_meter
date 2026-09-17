@@ -85,7 +85,7 @@ struct SettingsView: View {
             }
 
             Section {
-                LabeledContent("版本") { Text("0.2.0") }
+                LabeledContent("版本") { Text("0.2.1") }
                 LabeledContent("应用") { Text("AgentMeter") }
             } header: {
                 Text("关于")
@@ -195,7 +195,7 @@ struct AgentConfigRow: View {
         }
         .padding(.vertical, 2)
         .onAppear {
-            keyDraft = KeychainService.load(account: KeychainService.agentAccount(for: type)) ?? ""
+            keyDraft = SecretStore.load(account: SecretStore.agentAccount(for: type)) ?? ""
             urlDraft = config.baseURL ?? ""
             showURL = !(urlDraft.isEmpty)
         }
@@ -204,7 +204,7 @@ struct AgentConfigRow: View {
             guard type.needsKey else { return }
             try? await Task.sleep(nanoseconds: 400_000_000)
             guard !Task.isCancelled else { return }
-            KeychainService.save(keyDraft, account: KeychainService.agentAccount(for: type))
+            SecretStore.save(keyDraft, account: SecretStore.agentAccount(for: type))
         }
     }
 
