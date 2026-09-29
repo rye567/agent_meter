@@ -23,12 +23,22 @@ func IOHIDEventGetFloatValue(_ event: UnsafeMutableRawPointer, _ field: UInt32) 
 enum Thermal {
     private static let eventTypeTemperature: UInt32 = 15
 
-    /// CPU/SoC 温度：取 PMU die 传感器（M 系列 SoC 结温）最大值，
-    /// 兼容 M1/M2 时代的 pACC/eACC MTR Temp 命名。无可用传感器时为 nil。
-    static func cpuTemperature() -> Double? {
+    // 进程生命周期内只创建并复用同一个 IOHIDEventSystemClient。
+    // 关键约束：IOHIDEventSystemClientCreate 返回 +1 引用，但此处以裸指针持有（无 ARC 管理），
+    // 若每次采样新建且不释放，会在 WindowServer（window_service）侧按采样频率（1.5s/条）
+    // 永久累积 HID 连接；应用退出时系统集中回收全部连接，曾实测导致 WindowServer 停顿、
+    // 整机卡死（2026-09-29），因此必须复用，禁止按次创建。
+    private static let hidClient: UnsafeMutableRawPointer? = {
         guard let client = IOHIDEventSystemClientCreate(kCFAllocatorDefault) else { return nil }
         let matching = ["PrimaryUsagePage": 0xFF00, "PrimaryUsage": 0x0005] as CFDictionary
         IOHIDEventSystemClientSetMatching(client, matching)
+        return client
+    }()
+
+    /// CPU/SoC 温度：取 PMU die 传感器（M 系列 SoC 结温）最大值，
+    /// 兼容 M1/M2 时代的 pACC/eACC MTR Temp 命名。无可用传感器时为 nil。
+    static func cpuTemperature() -> Double? {
+        guard let client = hidClient else { return nil }
         guard let services = IOHIDEventSystemClientCopyServices(client) else { return nil }
 
         var best: Double? = nil
@@ -41,6 +51,8 @@ enum Thermal {
             let isMTR = name.hasPrefix("pACC MTR Temp") || name.hasPrefix("eACC MTR Temp")
             guard isDie || isMTR else { continue }
             guard let event = IOHIDServiceClientCopyEvent(service, eventTypeTemperature, 0, 0) else { continue }
+            // CopyEvent 返回 +1 引用且为裸指针（无 ARC 管理），读取后必须手动释放
+            defer { Unmanaged<AnyObject>.fromOpaque(event).release() }
             let value = IOHIDEventGetFloatValue(event, eventTypeTemperature << 16)
             guard value > 15 && value < 120 else { continue }
             if best == nil || value > best! { best = value }
