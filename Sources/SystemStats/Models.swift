@@ -101,19 +101,36 @@ struct SystemSnapshot {
 // MARK: - 单元格式化
 
 enum SysFormat {
+    private static let units: [(factor: Double, symbol: String)] = [
+        (1_125_899_906_842_624, "PB"), (1_099_511_627_776, "TB"),
+        (1_073_741_824, "GB"), (1_048_576, "MB"), (1_024, "KB"),
+    ]
+
+    // 按绝对值选择单位档位（bytes / ratio 共用，避免逻辑重复）
+    private static func unitPair(_ value: Double) -> (factor: Double, symbol: String) {
+        units.first(where: { abs(value) >= $0.factor }) ?? (1, "B")
+    }
+
     static func bytes(_ value: Int64, decimals: Int = 1) -> String {
-        let units: [(Double, String)] = [
-            (1_125_899_906_842_624, "PB"), (1_099_511_627_776, "TB"),
-            (1_073_741_824, "GB"), (1_048_576, "MB"), (1_024, "KB"),
-        ]
-        for (factor, unit) in units where abs(Double(value)) >= factor {
-            return String(format: "%.\(decimals)f %@", Double(value) / factor, unit)
-        }
-        return "\(value) B"
+        let (factor, unit) = unitPair(Double(value))
+        guard factor > 1 else { return "\(value) B" }
+        return String(format: "%.\(decimals)f %@", Double(value) / factor, unit)
     }
 
     static func bytes(_ value: Double) -> String {
         bytes(Int64(value))
+    }
+
+    /// 紧凑比例串（已用/总量共用一个单位）："312/494 GB"。
+    /// 用于系统监控半宽卡片，避免 "312 GB / 494 GB" 全写溢出截断；
+    /// TB 及以上保留 1 位小数，其余取整，兼顾精度与宽度。
+    static func ratio(_ used: Double, _ total: Double) -> String {
+        let (factor, unit) = unitPair(max(used, total))
+        guard factor > 1 else { return "\(Int64(used))/\(Int64(total)) B" }
+        let decimals = factor >= 1_099_511_627_776 ? 1 : 0
+        // 用 arguments 数组形式，避免插值格式串走 variadic 重载的解析歧义
+        return String(format: "%.\(decimals)f/%.\(decimals)f %@",
+                      arguments: [used / factor, total / factor, unit])
     }
 
     static func speed(_ bytesPerSec: Double) -> String {

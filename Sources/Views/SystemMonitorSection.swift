@@ -52,8 +52,8 @@ struct SystemMonitorSection: View {
                     SystemCell(
                         title: "磁盘", icon: "internaldrive", tint: .orange,
                         value: diskValue(snap.disk),
-                        badge: nil,
-                        subline: "R \(SysFormat.speed(snap.disk.readBytesPerSec)) · W \(SysFormat.speed(snap.disk.writeBytesPerSec))",
+                        badge: diskBadge(snap.disk),
+                        subline: diskSubline(snap.disk),
                         chart: WaveChart(series: [
                             .init(name: "读", values: snap.history.diskRead, color: .orange),
                             .init(name: "写", values: snap.history.diskWrite, color: .pink),
@@ -96,10 +96,32 @@ struct SystemMonitorSection: View {
         return parts.joined(separator: " · ")
     }
 
+    // 主值：系统盘已用/总量（同单位紧凑格式 "312/494 GB"，避免半宽卡片截断）；
+    // 拿不到卷数据时回退为读写速度，避免空白
     private func diskValue(_ disk: DiskSnapshot) -> String {
-        disk.writeBytesPerSec > 1 || disk.readBytesPerSec > 1
-            ? SysFormat.speed(disk.writeBytesPerSec)
-            : "空闲"
+        guard let volume = systemVolume(in: disk) else {
+            return disk.writeBytesPerSec > 1 || disk.readBytesPerSec > 1
+                ? SysFormat.speed(disk.writeBytesPerSec)
+                : "空闲"
+        }
+        return SysFormat.ratio(
+            Double(volume.totalBytes - volume.freeBytes),
+            Double(volume.totalBytes))
+    }
+
+    // badge：使用占比（如 "63%"）；无卷数据时不显示
+    private func diskBadge(_ disk: DiskSnapshot) -> String? {
+        systemVolume(in: disk).map { SysFormat.percent($0.usedFraction * 100) }
+    }
+
+    // 副标题：只放读写速度（占比已在 badge、用量已在主值，避免一行塞不下被截断）
+    private func diskSubline(_ disk: DiskSnapshot) -> String {
+        "R \(SysFormat.speed(disk.readBytesPerSec)) · W \(SysFormat.speed(disk.writeBytesPerSec))"
+    }
+
+    /// 优先取根卷（系统盘），未挂载时取第一个可见卷
+    private func systemVolume(in disk: DiskSnapshot) -> VolumeInfo? {
+        disk.volumes.first { $0.path.path == "/" } ?? disk.volumes.first
     }
 }
 
